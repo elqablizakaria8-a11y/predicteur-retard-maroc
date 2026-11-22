@@ -170,8 +170,7 @@ class PredictorTests(unittest.TestCase):
         self.predict()
         features = self.service.model.last_features
         self.assertEqual(list(features.columns), columns)
-        self.assertEqual(features.iloc[0]['meteo_Pluie'], 1)
-        self.assertEqual(features.iloc[0]['meteo_Soleil'], 0)
+        self.assertEqual(features.iloc[0]['intensite_meteo'], 2)
         self.assertEqual(features.iloc[0]['duree_theorique_min'], 20)
 
     def test_bad_service_data_is_rejected(self):

@@ -6,8 +6,9 @@ NUMERIC_FEATURES = [
     "distance_km", "duree_theorique_min", "heure_depart", "jour_semaine",
     "est_weekend", "est_heure_pointe", "est_intra_urbain",
 ]
-WEATHER = ["Forte pluie", "Nuageux", "Pluie", "Soleil"]
-FEATURE_COLUMNS = NUMERIC_FEATURES + [f"meteo_{value}" for value in WEATHER[1:]]
+WEATHER_LEVELS = {"Soleil": 0, "Nuageux": 1, "Pluie": 2, "Forte pluie": 3}
+WEATHER = list(WEATHER_LEVELS)
+FEATURE_COLUMNS = NUMERIC_FEATURES + ["intensite_meteo"]
 
 
 def prepare_features(frame):
@@ -26,9 +27,9 @@ def prepare_features(frame):
                         ("est_weekend", 1), ("est_heure_pointe", 1), ("est_intra_urbain", 1)]:
         if not (values[name].between(0, upper) & (values[name] % 1 == 0)).all():
             raise ValueError(f"{name} doit etre un entier entre 0 et {upper}")
-    # Encodage explicite: identique pour une ligne et pour un lot complet.
-    for weather in WEATHER[1:]:
-        values[f"meteo_{weather}"] = (frame["meteo"] == weather).astype(int)
+    # Ordre coherent avec les perturbations du generateur, identique en lot
+    # et en requete unitaire. Les arbres contraignent cette seule variable.
+    values["intensite_meteo"] = frame["meteo"].map(WEATHER_LEVELS).astype(int)
     return values.reindex(columns=FEATURE_COLUMNS)
 
 

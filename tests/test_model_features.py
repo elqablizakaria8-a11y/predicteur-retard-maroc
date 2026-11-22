@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from src.model_features import FEATURE_COLUMNS, WEATHER, alert_categories, prepare_features
+from src.model_features import FEATURE_COLUMNS, WEATHER, WEATHER_LEVELS, alert_categories, prepare_features
 
 
 class FeatureTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class FeatureTests(unittest.TestCase):
             single = prepare_features(pd.DataFrame([self.sample(weather)]))
             self.assertEqual(list(single.columns), FEATURE_COLUMNS)
             self.assertEqual(single.iloc[0].tolist(), batch.iloc[index].tolist())
-            self.assertEqual(int(single.filter(like='meteo_').sum(axis=1).iloc[0]), int(weather != 'Forte pluie'))
+            self.assertEqual(int(single.iloc[0]['intensite_meteo']), WEATHER_LEVELS[weather])
 
     def test_unsupported_weather_is_rejected(self):
         with self.assertRaises(ValueError):

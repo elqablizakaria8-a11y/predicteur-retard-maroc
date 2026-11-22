@@ -7,15 +7,15 @@ import joblib
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 
 try:
-    from .model_features import FEATURE_COLUMNS, alert_categories, prepare_features
+    from .model_features import FEATURE_COLUMNS, WEATHER, alert_categories, prepare_features
 except ImportError:
-    from model_features import FEATURE_COLUMNS, alert_categories, prepare_features
+    from model_features import FEATURE_COLUMNS, WEATHER, alert_categories, prepare_features
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,9 +51,11 @@ def entrainer_modele():
     # Test reserve a l'evaluation finale, jamais au choix du modele.
     development, test = train_test_split(np.arange(len(df)), test_size=0.2, random_state=42)
     train, validation = train_test_split(development, test_size=0.25, random_state=42)
+    monotonic = [int(column == 'intensite_meteo') for column in FEATURE_COLUMNS]
     models = {
         "linear_regression": LinearRegression(),
-        "random_forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
+        "random_forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1, monotonic_cst=monotonic),
+        "hist_gradient_boosting": HistGradientBoostingRegressor(random_state=42, monotonic_cst=monotonic),
     }
     validation_metrics = {}
     for name, model in models.items():
@@ -62,14 +64,25 @@ def entrainer_modele():
             y.iloc[validation], model.predict(X.iloc[validation]),
             X.iloc[validation].duree_theorique_min, X.iloc[validation].est_intra_urbain,
         )
-    selected = min(models, key=lambda name: validation_metrics[name]["mae_minutes"])
+    # La regression lineaire reste une comparaison, pas un candidat deployable
+    # car elle n'impose pas la regle d'ordre sur la meteo.
+    eligible = ['random_forest', 'hist_gradient_boosting']
+    selected = min(eligible, key=lambda name: validation_metrics[name]["mae_minutes"])
+    ordered_predictions = np.column_stack([
+        models[selected].predict(prepare_features(df.iloc[validation].assign(meteo=weather)))
+        for weather in WEATHER
+    ])
+    violations = int((np.diff(ordered_predictions, axis=1) < -1e-8).any(axis=1).sum())
+    if violations:
+        raise ValueError('Le modele selectionne viole l\'ordre meteo sur la validation')
     test_metrics = {}
     for name, model in models.items():
         test_metrics[name] = evaluate(y.iloc[test], model.predict(X.iloc[test]),
                                      X.iloc[test].duree_theorique_min, X.iloc[test].est_intra_urbain)
     # Ablation controlee: meme dataset, memes partitions, meme Random Forest.
     old_columns = [column for column in FEATURE_COLUMNS if column != "duree_theorique_min"]
-    without_reference = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+    without_reference = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1,
+        monotonic_cst=[int(column == 'intensite_meteo') for column in old_columns])
     without_reference.fit(X.iloc[train][old_columns], y.iloc[train])
     test_metrics["random_forest_without_reference"] = evaluate(
         y.iloc[test], without_reference.predict(X.iloc[test][old_columns]),
@@ -93,6 +106,9 @@ def entrainer_modele():
         "confusion_matrix_axes": "rows=actual, columns=predicted",
         "selected_model": selected,
         "selection_metric": "validation MAE",
+        "eligible_models": eligible,
+        "weather_policy": "Soleil <= Nuageux <= Pluie <= Forte pluie, all other inputs fixed",
+        "weather_validation": {"rows": len(validation), "ordering_violations": violations},
         "validation": validation_metrics,
         "test": test_metrics,
     }

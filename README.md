@@ -133,14 +133,21 @@ duration = float(model.predict(features.reindex(columns=columns))[0])
 ```
 
 Le nouvel artefact exige `duree_theorique_min`; l'ancien contrat a change.
-L'encodage meteo est explicite, avec `Forte pluie` comme reference. Les valeurs
+La meteo est encodee en `intensite_meteo` : Soleil=0, Nuageux=1, Pluie=2,
+Forte pluie=3. Ce classement suit les perturbations du generateur. Les valeurs
 inconnues sont rejetees au lieu d'etre silencieusement ignorees.
+Les arbres sont contraints pour qu'une aggravation de la meteo, a autres
+entrees identiques, ne puisse pas reduire la duree predite. Cette regle garantit
+la coherence de l'estimation; elle ne prouve pas sa precision dans le monde reel.
 
 ## Evaluation
 
 Partitions fixes : 60 % entrainement, 20 % validation, 20 % test.
-Le choix entre regression lineaire et Random Forest utilise uniquement la MAE
-de validation. Les modeles sauvegardes restent ceux ajustes sur l'entrainement.
+La regression lineaire sert de baseline. Le choix entre Random Forest et
+HistGradientBoosting, tous deux contraints sur l'intensite meteo, utilise
+uniquement la MAE de validation. Les modeles sauvegardes restent ceux ajustes
+sur l'entrainement. L'ordre des quatre conditions est aussi verifie sur les
+2000 exemples de validation avant toute sauvegarde.
 Le rapport `models/evaluation_modele.json` contient les versions, l'empreinte du
 dataset, la MAE, le R2, les erreurs urbaines/interurbaines et les matrices de
 confusion des alertes sur le test final.

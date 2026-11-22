@@ -23,9 +23,7 @@
     "est_weekend",
     "est_heure_pointe",
     "est_intra_urbain",
-    "meteo_Nuageux",
-    "meteo_Pluie",
-    "meteo_Soleil"
+    "intensite_meteo"
   ],
   "alert_labels": [
     "fluide (<5 min)",
@@ -35,22 +33,31 @@
   "confusion_matrix_axes": "rows=actual, columns=predicted",
   "selected_model": "random_forest",
   "selection_metric": "validation MAE",
+  "eligible_models": [
+    "random_forest",
+    "hist_gradient_boosting"
+  ],
+  "weather_policy": "Soleil <= Nuageux <= Pluie <= Forte pluie, all other inputs fixed",
+  "weather_validation": {
+    "rows": 2000,
+    "ordering_violations": 0
+  },
   "validation": {
     "linear_regression": {
       "rows": 2000,
-      "mae_minutes": 23.91087483717756,
-      "r2": 0.9879227246482346,
-      "alert_accuracy": 0.651,
+      "mae_minutes": 25.18937110392679,
+      "r2": 0.9873547541801725,
+      "alert_accuracy": 0.5645,
       "alert_confusion_matrix": [
         [
-          908,
-          86,
-          355
+          749,
+          257,
+          343
         ],
         [
-          45,
-          27,
-          212
+          22,
+          13,
+          249
         ],
         [
           0,
@@ -61,48 +68,83 @@
       "groups": {
         "urban": {
           "rows": 982,
-          "mae_minutes": 21.178263953051637,
-          "alert_accuracy": 0.6527494908350305
+          "mae_minutes": 21.371003458522264,
+          "alert_accuracy": 0.5101832993890021
         },
         "intercity": {
           "rows": 1018,
-          "mae_minutes": 26.54685115172732,
-          "alert_accuracy": 0.6493123772102161
+          "mae_minutes": 28.872708066389702,
+          "alert_accuracy": 0.6168958742632613
         }
       }
     },
     "random_forest": {
       "rows": 2000,
-      "mae_minutes": 6.6670804999999875,
-      "r2": 0.9969995540546174,
-      "alert_accuracy": 0.8615,
+      "mae_minutes": 5.659558806384593,
+      "r2": 0.9986154935981575,
+      "alert_accuracy": 0.8755,
       "alert_confusion_matrix": [
         [
-          1202,
-          123,
-          24
+          1249,
+          96,
+          4
         ],
         [
-          97,
-          167,
-          20
+          104,
+          175,
+          5
         ],
         [
-          0,
-          13,
-          354
+          5,
+          35,
+          327
         ]
       ],
       "groups": {
         "urban": {
           "rows": 982,
-          "mae_minutes": 2.326709775967413,
-          "alert_accuracy": 0.8727087576374746
+          "mae_minutes": 2.2469673080322665,
+          "alert_accuracy": 0.8778004073319755
         },
         "intercity": {
           "rows": 1018,
-          "mae_minutes": 10.853960707269131,
-          "alert_accuracy": 0.8506876227897839
+          "mae_minutes": 8.951469269431731,
+          "alert_accuracy": 0.8732809430255403
+        }
+      }
+    },
+    "hist_gradient_boosting": {
+      "rows": 2000,
+      "mae_minutes": 6.607621705684251,
+      "r2": 0.998314759326496,
+      "alert_accuracy": 0.847,
+      "alert_confusion_matrix": [
+        [
+          1211,
+          119,
+          19
+        ],
+        [
+          105,
+          164,
+          15
+        ],
+        [
+          21,
+          27,
+          319
+        ]
+      ],
+      "groups": {
+        "urban": {
+          "rows": 982,
+          "mae_minutes": 2.150159031028959,
+          "alert_accuracy": 0.8890020366598778
+        },
+        "intercity": {
+          "rows": 1018,
+          "mae_minutes": 10.907453087326193,
+          "alert_accuracy": 0.806483300589391
         }
       }
     }
@@ -110,19 +152,19 @@
   "test": {
     "linear_regression": {
       "rows": 2000,
-      "mae_minutes": 25.487723499887608,
-      "r2": 0.9770294791259525,
-      "alert_accuracy": 0.661,
+      "mae_minutes": 26.562515675703253,
+      "r2": 0.9762485431150095,
+      "alert_accuracy": 0.582,
       "alert_confusion_matrix": [
         [
-          947,
-          107,
-          311
+          798,
+          271,
+          296
         ],
         [
-          48,
-          26,
-          212
+          15,
+          17,
+          254
         ],
         [
           0,
@@ -133,83 +175,118 @@
       "groups": {
         "urban": {
           "rows": 1025,
-          "mae_minutes": 21.603200443929353,
-          "alert_accuracy": 0.6897560975609756
+          "mae_minutes": 21.741617530406323,
+          "alert_accuracy": 0.5492682926829269
         },
         "intercity": {
           "rows": 975,
-          "mae_minutes": 29.571452866407835,
-          "alert_accuracy": 0.6307692307692307
+          "mae_minutes": 31.630639366912842,
+          "alert_accuracy": 0.6164102564102564
         }
       }
     },
     "random_forest": {
       "rows": 2000,
-      "mae_minutes": 8.001821999999992,
-      "r2": 0.9918895777605785,
-      "alert_accuracy": 0.863,
+      "mae_minutes": 6.80435772764215,
+      "r2": 0.995156011604963,
+      "alert_accuracy": 0.8875,
       "alert_confusion_matrix": [
         [
-          1229,
-          106,
-          30
+          1288,
+          73,
+          4
         ],
         [
-          99,
-          166,
-          21
+          106,
+          171,
+          9
         ],
         [
           2,
-          16,
-          331
+          31,
+          316
         ]
       ],
       "groups": {
         "urban": {
           "rows": 1025,
-          "mae_minutes": 2.2652721951219514,
-          "alert_accuracy": 0.8887804878048781
+          "mae_minutes": 2.1082094961974365,
+          "alert_accuracy": 0.8995121951219512
         },
         "intercity": {
           "rows": 975,
-          "mae_minutes": 14.032553846153826,
-          "alert_accuracy": 0.8358974358974359
+          "mae_minutes": 11.741334073519926,
+          "alert_accuracy": 0.8748717948717949
+        }
+      }
+    },
+    "hist_gradient_boosting": {
+      "rows": 2000,
+      "mae_minutes": 6.803710215859335,
+      "r2": 0.9956360737923328,
+      "alert_accuracy": 0.87,
+      "alert_confusion_matrix": [
+        [
+          1244,
+          104,
+          17
+        ],
+        [
+          86,
+          182,
+          18
+        ],
+        [
+          9,
+          26,
+          314
+        ]
+      ],
+      "groups": {
+        "urban": {
+          "rows": 1025,
+          "mae_minutes": 2.024266776980621,
+          "alert_accuracy": 0.9092682926829269
+        },
+        "intercity": {
+          "rows": 975,
+          "mae_minutes": 11.82825331827029,
+          "alert_accuracy": 0.8287179487179487
         }
       }
     },
     "random_forest_without_reference": {
       "rows": 2000,
-      "mae_minutes": 23.946112760714286,
-      "r2": 0.9792445923471789,
-      "alert_accuracy": 0.7055,
+      "mae_minutes": 23.55647305428004,
+      "r2": 0.9803341669996746,
+      "alert_accuracy": 0.718,
       "alert_confusion_matrix": [
         [
-          1029,
-          139,
-          197
+          1064,
+          130,
+          171
         ],
         [
-          128,
-          103,
-          55
+          130,
+          108,
+          48
         ],
         [
-          49,
-          21,
-          279
+          66,
+          19,
+          264
         ]
       ],
       "groups": {
         "urban": {
           "rows": 1025,
-          "mae_minutes": 3.04469512195122,
-          "alert_accuracy": 0.8321951219512195
+          "mae_minutes": 2.8894162559347634,
+          "alert_accuracy": 0.8497560975609756
         },
         "intercity": {
           "rows": 975,
-          "mae_minutes": 45.919397970695975,
-          "alert_accuracy": 0.5723076923076923
+          "mae_minutes": 45.28337891920712,
+          "alert_accuracy": 0.5794871794871795
         }
       }
     },
