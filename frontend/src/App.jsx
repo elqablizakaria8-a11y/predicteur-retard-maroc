@@ -1,20 +1,18 @@
 import SimulationBar from './SimulationBar.jsx';
+import LiveTracking from './LiveTracking.jsx';
 import { formatClock, formatDelay, formatDuration, KpiCard, Sidebar, StatusChip, Topbar } from './Dashboard.jsx';
 import Home from './Home.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { Route, Navigation, MapPin, Clock3, CloudSun, Truck, Check, Info, LocateFixed, X, LoaderCircle, CalendarDays, ShieldCheck, Flag } from 'lucide-react';
-import { advanceSimulation, buildTrack, sampleTrack } from './simulation.js';
+import MapPanel from './MapPanel.jsx';
+import PageBanner from './PageBanner.jsx';
+import { Route, Navigation, MapPin, Clock3, CloudSun, Truck, Check, Info, X, LoaderCircle, CalendarDays, ShieldCheck, Flag } from 'lucide-react';
+import { advanceSimulation, buildTrack } from './simulation.js';
 
 const number = (value, digits = 1) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: digits }).format(value);
 function arrivalMinutes(iso) {
   const [hours, minutes] = iso.slice(11, 16).split(':').map(Number);
   return hours * 60 + minutes;
 }
-const latLon = (point) => [point[1], point[0]];
-const driverIcon = L.divIcon({ className: 'driver-marker', iconSize: [44, 44], iconAnchor: [22, 22], html: '<span><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h11v11H3zM14 10h4l3 4v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></span>' });
-
 async function request(path, body, signal) {
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -39,52 +37,33 @@ async function request(path, body, signal) {
   } finally { clearTimeout(timeout); signal?.removeEventListener('abort', abort); }
 }
 
-function FitRoute({ positions }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!positions?.length) return;
-    let frame;
-    const fit = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { map.invalidateSize(); map.fitBounds(positions, { padding: [40, 40], maxZoom: 15 }); }); };
-    fit();
-    const observer = new ResizeObserver(fit);
-    observer.observe(map.getContainer());
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [positions, map]);
-  return null;
-}
+const routes = { home: '', plan: '#/planifier', simulation: '#/simulation', tracking: '#/suivi' };
 
-function MapPanel({ result, track, fraction, running, mapRef }) {
-  const [tileError, setTileError] = useState(false);
-  const positions = useMemo(() => track?.coordinates.map(latLon), [track]);
-  const sample = track ? sampleTrack(track, fraction) : null;
-  return <div className="map-shell">
-    <MapContainer center={[32.6, -7.25]} zoom={6} ref={mapRef} scrollWheelZoom={false} className="journey-map" aria-label="Carte de l’itinéraire et position simulée">
-      <TileLayer url={import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'} attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' eventHandlers={{ tileerror: () => setTileError(true), load: () => setTileError(false) }} />
-      {positions && <><FitRoute positions={positions} />
-        <Polyline positions={positions} pathOptions={{ color: 'var(--route)', weight: 5, opacity: .85 }} />
-        {fraction > 0 && <Polyline positions={sample.travelled.map(latLon)} pathOptions={{ color: 'var(--sidebar)', weight: 6 }} />}
-        <CircleMarker center={positions[0]} radius={7} pathOptions={{ color: 'white', weight: 3, fillColor: '#168269', fillOpacity: 1 }}><Popup>Départ : {result.route.departure.label}</Popup></CircleMarker>
-        <CircleMarker center={positions.at(-1)} radius={7} pathOptions={{ color: 'white', weight: 3, fillColor: '#d18c34', fillOpacity: 1 }}><Popup>Arrivée : {result.route.arrival.label}</Popup></CircleMarker>
-        <Marker position={latLon(sample.position)} icon={driverIcon} alt="Livreur simulé"><Popup>Position simulée · {number(fraction * 100, 0)} % du trajet</Popup></Marker>
-      </>}
-    </MapContainer>
-    <div className="map-caption"><span className="map-caption-icon"><Route size={17} /></span><span>{result ? `${result.route.departure.label.split(',')[0]} · ${result.route.arrival.label.split(',')[0]}` : 'Maroc · choisissez votre itinéraire'}</span></div>
-    {result && <button type="button" className="map-recenter" title="Recentrer l’itinéraire" aria-label="Recentrer l’itinéraire" onClick={() => mapRef.current?.fitBounds(positions, { padding: [55, 55] })}><LocateFixed size={19} /></button>}
-    <div className="map-mode"><span className={running ? 'pulse-dot' : 'small-square'} />{running ? 'Simulation en cours' : 'Aucun suivi GPS réel'}</div>
-    {tileError && <div className="tile-error" role="status">Fond de carte indisponible. L’itinéraire reste utilisable.</div>}
-  </div>;
-}
-
-function readView() {
-  if (window.location.hash === '#/planifier') return 'plan';
-  if (window.location.hash === '#/simulation') return 'simulation';
+function readView(hash) {
+  const path = hash.split('?')[0];
+  if (path === routes.plan) return 'plan';
+  if (path === routes.simulation) return 'simulation';
+  if (path === routes.tracking) return 'tracking';
   return 'home';
 }
 
 export default function App() {
   const [config, setConfig] = useState(null), [configError, setConfigError] = useState('');
   const [form, setForm] = useState({ departure: 'Casablanca', arrival: 'Rabat', departure_time: '', urban: false });
-  const [view, setView] = useState(readView), [about, setAbout] = useState(false);
+  const [hash, setHash] = useState(() => window.location.hash), [about, setAbout] = useState(false);
+  const [customer, setCustomer] = useState(false);
+  const [trackingVersion, setTrackingVersion] = useState(0);
+  async function signOut() {
+    try {
+      const response = await fetch('/api/auth/session', { method: 'DELETE' });
+      if (!response.ok) throw new Error();
+      setCustomer(false);
+      setTrackingVersion(version => version + 1);
+    } catch {
+      window.alert('Impossible de vous déconnecter. Réessayez.');
+    }
+  }
+  const view = readView(hash);
   const [result, setResult] = useState(null), [lastForm, setLastForm] = useState(null);
   const [loading, setLoading] = useState(false), [error, setError] = useState(''), [selection, setSelection] = useState(null);
   const [running, setRunning] = useState(false), [elapsed, setElapsed] = useState(0), [speed, setSpeed] = useState(120);
@@ -148,14 +127,14 @@ export default function App() {
   }
   const reset = () => { setRunning(false); setElapsed(0); };
   useEffect(() => {
-    const syncView = () => { setView(readView()); setRunning(false); };
+    const syncView = () => { setHash(window.location.hash); setRunning(false); };
     window.addEventListener('hashchange', syncView);
     return () => window.removeEventListener('hashchange', syncView);
   }, []);
 
   const navigate = (page) => {
-    window.location.hash = page === 'home' ? '' : page === 'plan' ? '/planifier' : '/simulation';
-    setView(page);
+    window.location.hash = routes[page];
+    setHash(routes[page]);
     setRunning(false);
     window.scrollTo(0, 0);
   };
@@ -164,10 +143,11 @@ export default function App() {
   return <div className="app-shell">
     <Sidebar view={view} navigate={navigate} onAbout={() => setAbout(true)} />
     <div className="workspace">
-      <Topbar view={view} navigate={navigate} onAbout={() => setAbout(true)} notification={error || result?.alert.label} />
+      <Topbar onSignOut={customer ? signOut : undefined} view={view} navigate={navigate} onAbout={() => setAbout(true)} notification={error || result?.alert.label} />
 
-      {view === 'home' ? <Home navigate={navigate} /> : <main>
-        <div className="page-heading"><div><div className="eyebrow"><span /> ANTICIPER. PLANIFIER. LIVRER.</div><h1>{view === 'plan' ? 'Vos trajets, mieux anticipés.' : 'Votre livraison prend la route.'}</h1><p>{view === 'plan' ? 'Estimez votre temps de route et partez avec une longueur d’avance.' : 'Explorez votre itinéraire avec une simulation de déplacement.'}</p></div><div className="region-chip"><MapPin size={15} />Maroc</div></div>
+      {view === 'home' ? <Home navigate={navigate} /> :
+        view === 'tracking' ? <LiveTracking tripConfig={config} key={trackingVersion} hash={hash} onSessionChange={setCustomer} /> : <main>
+        <PageBanner simulation={view === 'simulation'} />
 
         {configError && <div className="notice error-notice" role="alert"><Info size={19} /><span>{configError}</span><button onClick={() => loadConfig()}>Réessayer</button></div>}
 

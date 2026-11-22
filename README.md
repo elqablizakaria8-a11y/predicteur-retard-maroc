@@ -1,5 +1,55 @@
 # Predicteur de retard de trajet au Maroc
 
+## Suivi GPS
+
+Le client ouvre **Mes livraisons** avec son compte. Chaque livraison conserve
+son trajet et son arrivée prévue dans SQLite. Le livreur et le destinataire
+utilisent deux liens privés distincts. Les liens bruts et les QR codes
+apparaissent uniquement sur l’écran de création. Le serveur stocke leur
+empreinte SHA-256. Les QR codes sont générés localement.
+
+1. Installez les dépendances avec `.\.venv\Scripts\python.exe -m pip install -r requirements.txt`,
+   puis construisez le frontend avec `npm --prefix frontend run build`.
+2. Copiez `.env.example` vers `.env` pour une nouvelle installation. Choisissez
+   une clé d’installation privée d’au moins 24 caractères. Démarrez `.\start.ps1`.
+3. Dans **Suivi GPS**, utilisez la clé une fois pour créer le compte client.
+   Google est optionnel (callback : `/api/auth/google/callback`). La récupération
+   par e-mail nécessite Resend et un expéditeur vérifié.
+4. Dans **Nouvelle livraison**, indiquez un départ futur dans la fenêtre météo
+   de sept jours et le contact du livreur. Copiez les liens, scannez les QR
+   codes ou ouvrez WhatsApp pour envoyer le message. Les invitations automatiques
+   utilisent Resend ou SMTP avec STARTTLS. Le client et le destinataire reçoivent
+   le lien de suivi. Seule l’adresse du livreur reçoit le lien de conduite.
+
+### Essai avec deux appareils
+
+Sur le poste de développement, lancez `cloudflared tunnel --url http://127.0.0.1:8000`
+avec cloudflared installé. Renseignez son origine HTTPS dans `WASEL_PUBLIC_URL`,
+redémarrez Wasel, puis créez une nouvelle livraison depuis cette adresse.
+La page du téléphone doit rester ouverte. Appuyez sur **Démarrer la livraison**
+et autorisez le GPS. Sur un autre appareil, ouvrez le lien de suivi. Vérifiez
+la position, puis arrêtez le partage et testez **J’ai livré**. Un téléphone
+verrouillé ou hors réseau peut suspendre les mises à jour.
+
+### Déploiement
+
+Servez le build Vite et FastAPI derrière un proxy HTTPS avec une origine
+stable. Configurez cette origine dans `WASEL_PUBLIC_URL` avant de générer des
+liens. Désactivez les journaux d’accès contenant chemins privés et paramètres
+OAuth dans le proxy et Uvicorn. Conservez la base `WASEL_AUTH_DB` sur un volume
+persistant privé, inaccessible au serveur de fichiers statiques. Redémarrez
+après toute modification de `.env`.
+
+Le navigateur sollicite le GPS toutes les cinq secondes. Une position vieille
+de 30 secondes est signalée. La dernière position et jusqu’à 12 mesures sont
+conservées pendant le partage. L’arrêt et la livraison effacent ces mesures.
+Le calcul d’arrivée utilise le modèle existant et la position actuelle, au
+plus une fois par minute. La dernière estimation datée reste visible si les
+services de routage ou de météo sont indisponibles. Les liens expirent deux
+heures après la livraison, ou après 24 heures sans activité GPS pour une
+livraison inutilisée ou abandonnée. Les anciennes URL du pilote en mémoire
+doivent être remplacées par les liens générés dans **Mes livraisons**.
+
 Prototype de prediction de **duree de conduite** sur donnees synthetiques.
 La preparation d'une commande, l'attente du livreur et la remise au client ne
 sont pas modelisees.
@@ -7,8 +57,7 @@ sont pas modelisees.
 ## Interface React et simulation
 
 L'interface **Wasel** utilise React, Tailwind CSS et Leaflet; FastAPI appelle
-les services Python existants. Il s'agit d'une application locale, pas d'un
-service de suivi GPS reel. Le modele sauvegarde est reutilise sans entrainement.
+les services Python existants. La simulation et le suivi GPS du livreur sont accessibles dans deux vues distinctes. Le modele sauvegarde est reutilise sans entrainement.
 
 Prerequis : Python 3.13 et Node.js compatible Vite (22.12 ou plus recent).
 Depuis la racine du depot :
@@ -20,7 +69,7 @@ cd frontend
 npm ci
 npm run build
 cd ..
-.\.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Ouvrir ensuite **http://127.0.0.1:8000**. Garder le terminal ouvert pendant
@@ -159,8 +208,7 @@ controlee avec les nouveaux scores.
 
 Ces mesures evaluent des regles de simulation, pas la precision du trafic reel.
 Les services de routage, meteo et prediction sont disponibles.
-L'interface React et la simulation sont disponibles; le suivi GPS reel reste
-a implementer.
+Le simulateur utilise la géométrie de l’itinéraire. Le suivi GPS reçoit les positions envoyées par le téléphone du livreur.
 
 ## Routage (Nominatim + OSRM)
 

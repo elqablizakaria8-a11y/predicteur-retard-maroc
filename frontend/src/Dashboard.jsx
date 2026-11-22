@@ -1,4 +1,5 @@
-import { Bell, CircleHelp, House, Info, Route, Search, Truck } from 'lucide-react';
+import { EmptyState, Skeleton } from './UiStates.jsx';
+import { Bell, CircleHelp, House, Info, LocateFixed, Route, Search, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { WaselIcon, WaselLogoWhite } from './Logo.jsx';
 
@@ -6,6 +7,7 @@ const pages = [
   { id: 'home', label: 'Accueil', icon: House },
   { id: 'plan', label: 'Planifier un trajet', icon: Route },
   { id: 'simulation', label: 'Simulation', icon: Truck },
+  { id: 'tracking', label: 'Suivi GPS', icon: LocateFixed },
 ];
 
 export function Sidebar({ view, navigate, onAbout }) {
@@ -31,7 +33,7 @@ export function Sidebar({ view, navigate, onAbout }) {
   );
 }
 
-export function Topbar({ view, navigate, onAbout, notification }) {
+export function Topbar({ view, navigate, onAbout, notification, onSignOut }) {
   const [query, setQuery] = useState('');
   const matches = pages.filter(({ label }) => label.toLocaleLowerCase('fr').includes(query.trim().toLocaleLowerCase('fr')));
   return (
@@ -42,7 +44,7 @@ export function Topbar({ view, navigate, onAbout, notification }) {
           <summary aria-label="Rechercher une page"><Search size={18} /><span>Rechercher une page</span></summary>
           <div className="popover-body">
             <input className="page-search" aria-label="Nom de la page" placeholder="Nom de la page" value={query} onChange={event => setQuery(event.target.value)} />
-            {matches.length === 0 && <p>Aucune page trouvée.</p>}
+            {matches.length === 0 && <EmptyState>Aucune page trouvée.</EmptyState>}
             {matches.map(({ id, label }) => (
               <button key={id} onClick={event => {
                 event.currentTarget.closest('details').open = false;
@@ -57,6 +59,7 @@ export function Topbar({ view, navigate, onAbout, notification }) {
           <div className="popover-body"><strong>Notifications</strong><p>{notification || 'Aucune alerte pour le moment.'}</p></div>
         </details>
         <button className="icon-button" aria-label="Comprendre les estimations" onClick={onAbout}><Info size={20} /></button>
+        {onSignOut && <button type="button" className="text-button" onClick={onSignOut}>Se déconnecter</button>}
         <span className="avatar" aria-label="Espace Maroc">MA</span>
       </div>
     </header>
@@ -118,7 +121,7 @@ export function KpiCard({ icon: Icon, label, value, format = formatNumber, suffi
   return (
     <div className={`metric ${className}`} aria-busy={loading}>
       <div className="metric-label"><span className="kpi-icon"><Icon size={17} /></span>{label}</div>
-      {loading ? <div className="kpi-skeleton"><span className="sr-only">Calcul en cours</span></div> :
+      {loading ? <div className="kpi-skeleton"><span className="sr-only">Calcul en cours</span><Skeleton /></div> :
         value == null ? <p className="kpi-empty">À calculer</p> :
           <CountUp key={value} value={value} format={format} suffix={suffix} />}
     </div>

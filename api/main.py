@@ -4,11 +4,14 @@ import json
 import os
 from pathlib import Path
 
+from api.auth import auth_router
+
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from api.deliveries import delivery_router
 
 from services.predictor_logic import (
     InvalidPredictionError, ModelLoadError, PredictionError, PredictorService,
@@ -58,9 +61,24 @@ def error_response(status, code, message, **extra):
 
 def create_app():
     app = FastAPI(title='Wasel — Predicteur Maroc', version='0.1.0')
+    auth, signed_in = auth_router()
+    app.include_router(auth)
+    app.include_router(delivery_router(signed_in, get_service))
+
+    @app.middleware('http')
+    async def private_delivery_headers(request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith(('/livreur/', '/suivi/', '/api/deliveries')):
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['Referrer-Policy'] = 'no-referrer'
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
+        if request.url.path.startswith('/api/deliveries'):
+            return JSONResponse(status_code=422, content={'detail': 'Vérifiez le trajet, les contacts et les données de position.'})
+        if request.url.path.startswith('/api/auth/'):
+            return JSONResponse(status_code=422, content={'detail': 'Vérifiez les champs du formulaire.'})
         return error_response(422, 'invalid_input', 'Vérifiez les lieux, la date et le type de trajet.')
 
     @app.exception_handler(RoutingError)
@@ -120,6 +138,12 @@ def create_app():
     def favicon():
         return FileResponse(ROOT / 'frontend/public/favicon.svg')
 
+    @app.get('/images/gps-login.webp', include_in_schema=False)
+    def gps_login_image():
+        return FileResponse(ROOT / 'frontend/public/images/gps-login.webp', media_type='image/webp')
+
+    @app.get('/livreur/{token}', include_in_schema=False)
+    @app.get('/suivi/{token}', include_in_schema=False)
     @app.get('/', include_in_schema=False)
     def index():
         if (dist / 'index.html').is_file():

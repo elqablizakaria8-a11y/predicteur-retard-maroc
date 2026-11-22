@@ -260,3 +260,17 @@
   .sidebar .brand > .wasel-logo { display: none; }
   .sidebar .brand > .compact-brand { display: inline-flex; }
 }
+
+.page-banner {
+  min-height: 220px;
+  padding: clamp(20px, 4vw, 48px);
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--sidebar-deep), transparent), var(--sidebar) url('./images/forest-road.jpg') center / cover;
+}
+.page-banner-simulation {
+  background-image: linear-gradient(90deg, var(--sidebar-deep), transparent), url('./images/urban-highway.jpg');
+}
+.page-banner h1, .page-banner p { color: var(--surface); }
+.page-banner p { max-width: 50ch; }
+.ui-empty { color: var(--text-muted); }
+:focus-visible { outline: 3px solid var(--route); outline-offset: 3px; }

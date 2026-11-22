@@ -6,3 +6,8 @@ requests
 tzdata==2026.6
 fastapi==0.165.0
 uvicorn==0.54.0
+
+argon2-cffi
+SQLAlchemy
+python-dotenv
+google-auth

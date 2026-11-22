@@ -84,3 +84,11 @@
   .nav-item span { display: none; }
   .sidebar .nav-item { min-width: 43px; justify-content: center; }
 }
+
+.home-step-number { color: var(--sidebar); }
+.home-route-preview { position: absolute; inset: 15% 12% 25%; display: grid; place-items: center; pointer-events: none; }
+.home-route-preview svg { width: min(100%, 320px); overflow: visible; }
+.home-route-preview path { stroke: var(--route); stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.home-route-preview circle { fill: var(--surface); stroke: var(--route); stroke-width: 4; }
+.home-hero-visual { position: relative; }
+.home-hero-visual .hero-route { position: relative; }

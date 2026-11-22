@@ -19,15 +19,16 @@ const features = [
   [Route, 'Écart estimé', 'Comparez la prédiction au temps de référence OSRM.'],
   [CloudSun, 'Météo au départ', 'Consultez les conditions prévues à l’heure choisie.'],
   [Truck, 'Simulation', 'Suivez un véhicule simulé sur l’itinéraire.'],
+  [Navigation, 'Suivi GPS', 'Consultez la dernière position partagée par un livreur.'],
   [MapPin, 'Couverture Maroc', 'Planifiez des trajets urbains et interurbains.'],
 ];
 
-export function StepCard({ icon: Icon, title, description, preview, image, alt }) {
+export function StepCard({ icon: Icon, title, description, preview, image, alt, step }) {
   return <article className="card home-step">
     <img className="step-photo" src={image} alt={alt} loading="lazy" decoding="async" />
     <div className="step-copy">
       <div className="step-preview" aria-hidden="true"><Icon size={17} /><span>{preview}</span></div>
-      <h3>{title}</h3><p>{description}</p>
+      <h3>{step && <span className="home-step-number">{step}. </span>}{title}</h3><p>{description}</p>
     </div>
   </article>;
 }
@@ -53,6 +54,7 @@ export default function Home({ navigate }) {
         </div>
       </div>
       <div className="home-hero-visual" role="img" aria-label="Illustration aérienne d’une route bordée d’arbres">
+        <div className="home-route-preview" aria-hidden="true"><svg viewBox="0 0 240 120"><path d="M16 94 56 81 97 91 130 45 178 52 222 20" /><circle cx="16" cy="94" r="6" /><circle cx="222" cy="20" r="6" /></svg></div>
         <div className="hero-route"><Route size={20} /><span>Casablanca <span aria-hidden="true">→</span> Rabat<small>Exemple de trajet</small></span></div>
       </div>
     </section>
@@ -60,7 +62,7 @@ export default function Home({ navigate }) {
     <section className="home-section" aria-labelledby="how-title">
       <h2 id="how-title">Comment ça marche</h2>
       <ol className="home-steps">
-        {steps.map(([icon, title, description, preview, image, alt]) => <li key={title}><StepCard {...{ icon, title, description, preview, image, alt }} /></li>)}
+        {steps.map(([icon, title, description, preview, image, alt], index) => <li key={title}><StepCard {...{ icon, title, description, preview, image, alt, step: index + 1 }} /></li>)}
       </ol>
     </section>
 
