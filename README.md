@@ -4,6 +4,86 @@ Prototype de prediction de **duree de conduite** sur donnees synthetiques.
 La preparation d'une commande, l'attente du livreur et la remise au client ne
 sont pas modelisees.
 
+## Interface React et simulation
+
+L'interface **Wasel** utilise React, Tailwind CSS et Leaflet; FastAPI appelle
+les services Python existants. Il s'agit d'une application locale, pas d'un
+service de suivi GPS reel. Le modele sauvegarde est reutilise sans entrainement.
+
+Prerequis : Python 3.13 et Node.js compatible Vite (22.12 ou plus recent).
+Depuis la racine du depot :
+
+```powershell
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+cd frontend
+npm ci
+npm run build
+cd ..
+.\.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+Ouvrir ensuite **http://127.0.0.1:8000**. Garder le terminal ouvert pendant
+l'utilisation. Les donnees et les fichiers `.pkl` doivent etre presents.
+Ne pas regenerer le dataset ni reentrainer pour simplement lancer l'interface.
+Apres cette installation, `./start.ps1` lance le serveur avec le meme environnement.
+
+Pour developper avec rechargement a chaud, conserver le backend sur le port
+8000 et lancer `npm run dev` depuis `frontend` dans un second terminal.
+Ouvrir http://127.0.0.1:5173. Vite transmet `/api` au backend sur la meme machine.
+Le serveur Python sert aussi le build React : aucun CORS generique n'est ajoute.
+
+### Utilisation
+
+1. Choisir deux lieux, la date/heure Maroc et le type urbain/interurbain.
+2. Cliquer sur **Estimer mon trajet**. Les suggestions de villes sont locales;
+   le geocodage externe est declenche uniquement par cette soumission.
+3. Si plusieurs adresses correspondent, choisir explicitement un candidat.
+4. Lire la reference OSRM, la duree predite, l'ecart et l'heure d'arrivee.
+5. Demarrer la simulation, changer sa vitesse, mettre en pause ou reinitialiser.
+
+Le marqueur est interpole selon les distances entre les sommets GeoJSON, pas
+simplement selon leur nombre. Le navigateur utilise le temps ecoule et le
+facteur choisi (x1, x30, x120 ou x600). Le parcours est borne a son arrivee.
+La progression et les temps/distances restants sont **simules**, sans nouveaux
+appels d'API a chaque image. Cette animation ne valide pas la precision du modele.
+Modifier le formulaire ne remplace pas l'ancien resultat avant un nouveau calcul.
+
+Les libelles SIMULATION, l'absence de GPS reel et la nature experimentale du
+modele sont visibles. Une fenetre explique aussi les limites et seuils.
+Les cartes utilisent les tuiles OpenStreetMap avec attribution et cache normal
+du navigateur, sans telechargement hors-ligne ni prechargement massif :
+[politique des tuiles](https://operations.osmfoundation.org/policies/tiles/).
+Un acces Internet reste necessaire pour la carte et les fournisseurs externes.
+
+### API et tests
+
+- `GET /api/health` : etat du serveur et mode simulation.
+- `GET /api/config` : villes locales et fenetre de dates au fuseau Maroc.
+- `POST /api/geocode` : recherche explicite d'un lieu; HTTP 409 avec candidats
+  en cas d'ambiguite.
+- `POST /api/predict` : prediction avec `departure`, `arrival`, `departure_time`
+  et un booleen strict `urban`. Les lieux peuvent etre des coordonnees choisies.
+- `/docs` : documentation interactive FastAPI.
+
+Les erreurs JSON ont la forme `{"error":{"code":"...","message":"..."}}`.
+Une condition non supportee ou un fournisseur indisponible ne produit pas de
+prediction de remplacement. Le modele est charge une fois par processus.
+`MODEL_DIR` permet de choisir un repertoire d'artefacts different pour les tests.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
+cd frontend
+npm test
+npm run build
+```
+
+Les tests HTTP utilisent des services simules, sans appels externes.
+Ce prototype est prevu pour une execution locale sur une seule machine avec
+les caches partages. Le suivi reel, les comptes et l'hebergement public sont
+des etapes ulterieures.
+
 ## Installation et execution
 
 Depuis la racine du projet, avec Python 3.13 :
@@ -72,7 +152,8 @@ controlee avec les nouveaux scores.
 
 Ces mesures evaluent des regles de simulation, pas la precision du trafic reel.
 Les services de routage, meteo et prediction sont disponibles.
-L'interface Streamlit reste a implementer.
+L'interface React et la simulation sont disponibles; le suivi GPS reel reste
+a implementer.
 
 ## Routage (Nominatim + OSRM)
 
