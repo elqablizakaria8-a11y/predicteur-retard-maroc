@@ -71,8 +71,8 @@ Les anciens scores sur l'ancien dataset ne constituent pas une comparaison
 controlee avec les nouveaux scores.
 
 Ces mesures evaluent des regles de simulation, pas la precision du trafic reel.
-Le service de routage est disponible. La meteo, l'orchestration des predictions
-et l'interface Streamlit restent a implementer.
+Les services de routage et meteo sont disponibles. L'orchestration des
+predictions et l'interface Streamlit restent a implementer.
 
 ## Routage (Nominatim + OSRM)
 
@@ -137,3 +137,76 @@ Configuration facultative par variables d'environnement :
 
 Les tests de routage simulent les reponses HTTP; ils ne consomment pas les API.
 Pour verifier les services publics, executer manuellement la commande ci-dessus.
+
+## Meteo a l'heure de depart (Open-Meteo)
+
+Test manuel pour Casablanca a la prochaine heure entiere :
+
+```powershell
+python -m services.weather_api 33.5731 -7.5898
+```
+
+Avec une date et heure futures choisies dans la fenetre de prevision :
+
+```python
+from datetime import datetime, timedelta, timezone
+from services.weather_api import WeatherClient
+
+departure = datetime.now(timezone.utc) + timedelta(hours=2)
+weather = WeatherClient().get_forecast(33.5731, -7.5898, departure)
+print(weather['meteo'], weather['temperature_c'])
+```
+
+La methode accepte un `datetime` ou une chaine ISO avec date **et** heure.
+Sans decalage UTC, la saisie est interpretee en `Africa/Casablanca`.
+Avec un decalage (ex. `+01:00` ou `Z`), l'instant est converti au fuseau Maroc.
+Les changements d'heure sont geres par IANA via `zoneinfo` et `tzdata`, sans
+supposer que le Maroc reste toute l'annee a UTC+1. Les heures locales doubles
+ou inexistantes sont refusees sans indication explicite du decalage.
+
+Les previsions horaires sont demandees en timestamps UTC pour les 7 jours du
+fournisseur a partir de minuit UTC du jour courant. Les departs passes ou hors
+de cette fenetre sont refuses. A 14h45, la ligne horaire de 14h00 est utilisee :
+aucune interpolation ni substitution par la meteo actuelle n'est effectuee.
+La disponibilite de la ligne et de ses valeurs est verifiee apres reception.
+Le resultat contient `meteo`, `temperature_c`, `weather_code`, `departure_time`,
+`forecast_time`, `timezone`, `source` et `attribution`.
+
+### Correspondance WMO vers les categories du modele
+
+| Codes WMO | Categorie utilisee |
+| --- | --- |
+| 0, 1 | Soleil |
+| 2, 3 | Nuageux |
+| 51, 53, 55, 61, 63, 80, 81 | Pluie |
+| 65, 82 | Forte pluie |
+
+Cette reduction est une convention de l'application. `Soleil` signifie aussi
+ciel degage la nuit; ce n'est pas une mesure d'ensoleillement.
+Le brouillard, les precipitations verglaçantes, la neige, les orages et les
+codes inconnus levent `UnsupportedWeatherError` car le modele n'a pas ete
+entraine sur ces conditions. Ils ne sont pas remplaces par une categorie
+arbitraire. Toutes les erreurs meteo heritent de `WeatherError`, notamment
+`ForecastUnavailableError`, `InvalidWeatherInputError`,
+`WeatherServiceUnavailableError` et `InvalidWeatherResponseError`.
+
+### Cache et conditions d'utilisation
+
+Cache partage SQLite de 15 minutes dans `cache/weather.sqlite3` (ignore par
+Git). Les heures de depart d'un meme lieu reutilisent la meme prevision.
+La cle inclut le jour UTC pour eviter de reutiliser une ancienne fenetre apres
+minuit. Une erreur ne sert jamais de prevision perimee. Les requetes locales
+sont espacees d'au moins une seconde, sans retry automatique.
+
+Le service gratuit sans cle convient au prototype educatif non commercial;
+il impose des quotas. Une utilisation commerciale, par exemple un service de
+livraison exploite commercialement, necessite de revoir l'offre fournisseur.
+Afficher l'attribution Open-Meteo avec les resultats.
+Voir la [documentation et les codes WMO](https://open-meteo.com/en/docs) et les
+[conditions d'utilisation](https://open-meteo.com/en/terms).
+
+Configuration facultative : `OPEN_METEO_URL` (URL complete compatible avec
+`/v1/forecast`) et `WEATHER_CACHE_PATH` (cache partage sur une seule machine).
+Les tests meteo simulent les reponses HTTP et ne consomment pas les API.
+La temperature est informative : elle n'est pas une entree du modele actuel.
+La prevision concerne uniquement le point de depart, pas tout le trajet.
