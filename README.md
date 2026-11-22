@@ -71,4 +71,69 @@ Les anciens scores sur l'ancien dataset ne constituent pas une comparaison
 controlee avec les nouveaux scores.
 
 Ces mesures evaluent des regles de simulation, pas la precision du trafic reel.
-Les API de routage/meteo et l'interface Streamlit restent a implementer.
+Le service de routage est disponible. La meteo, l'orchestration des predictions
+et l'interface Streamlit restent a implementer.
+
+## Routage (Nominatim + OSRM)
+
+Depuis la racine du projet :
+
+```powershell
+python -m services.routing_api Casablanca Rabat
+```
+
+Ou dans le futur backend :
+
+```python
+from services.routing_api import RoutingClient
+
+client = RoutingClient()
+route = client.calculate_route('Casablanca', 'Rabat')
+distance = route['distance_km']
+reference_minutes = route['duree_theorique_min']
+```
+
+Les noms exacts des 16 villes (casse et accents ignores) utilisent le fichier
+local, sans appel Nominatim. Ces points sont des centres de ville approximatifs,
+pas des adresses de livraison. Pour un trajet dans une meme ville, fournir deux
+adresses distinctes. Les autres recherches passent par Nominatim; le filtre
+`ma,eh` couvre la zone des lieux du fichier local selon les codes du fournisseur.
+Une recherche ambigue leve `AmbiguousPlaceError` avec une liste `candidates` :
+la future interface devra demander un choix explicite, puis appeler
+`client.route(departure, arrival)` avec les lieux choisis.
+
+OSRM recoit **lon,lat** et fournit des metres et secondes, convertis en km et
+minutes. Le resultat contient aussi les lieux, une geometrie GeoJSON et
+`attribution`, a afficher dans l'interface. Le trajet est automobile. La duree
+de reference ne contient pas d'information de trafic en direct.
+La recherche de route est limitee aux routes situees a moins de 1 km des points.
+Une erreur, une absence de route ou un lieu inconnu ne produit aucun resultat
+de remplacement invente. Les exceptions heritent de `RoutingError`.
+
+### Conditions des services publics
+
+Lire la [politique Nominatim](https://operations.osmfoundation.org/policies/nominatim/).
+Appels uniquement sur soumission explicite, **aucune autocompletion**, pas de
+collecte massive ni de donnees personnelles/confidentielles. Le client emet un
+User-Agent identifiant le projet, conserve les recherches 30 jours et limite
+les requetes a une par seconde par fournisseur. Il conserve les routes une heure.
+Les resultats et les horodatages sont partages entre processus dans
+`cache/routing.sqlite3`, ignore par Git. Tous les clients doivent utiliser le
+meme cache sur une seule machine; un deploiement distribue exige un limiteur
+central avant utilisation du service public. Aucun renouvellement automatique
+ni retry n'est effectue. Un cache expire est renouvele uniquement a la demande.
+
+Le [serveur de demonstration OSRM](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server)
+convient a une utilisation raisonnable et non commerciale, sans garantie de
+disponibilite. La [documentation HTTP](https://github.com/Project-OSRM/osrm-backend/blob/master/docs/http.md)
+decrit les unites, erreurs et coordonnees.
+
+Configuration facultative par variables d'environnement :
+
+- `NOMINATIM_URL` : URL de base du geocodeur compatible Nominatim.
+- `OSRM_URL` : URL de base du routeur compatible OSRM.
+- `ROUTING_USER_AGENT` : identifiant de l'application (ajouter un contact reel).
+- `ROUTING_CACHE_PATH` : chemin du cache partage.
+
+Les tests de routage simulent les reponses HTTP; ils ne consomment pas les API.
+Pour verifier les services publics, executer manuellement la commande ci-dessus.
