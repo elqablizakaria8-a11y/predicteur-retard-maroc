@@ -26,8 +26,8 @@ Les variables sont : `distance_km`, `duree_theorique_min`, `heure_depart` (0-23)
 `jour_semaine` (lundi=0), `est_weekend`, `est_heure_pointe`,
 `est_intra_urbain` et `meteo`.
 Les creneaux de pointe sont actuellement 8, 9, 12, 13, 18, 19 et 20 heures
-en semaine. La regle de determination urbain/interurbain reste a definir pour
-les futures entrees API.
+en semaine. Le type urbain/interurbain doit etre choisi explicitement par
+l'appelant; il n'est pas deduit de la distance ni des noms des lieux.
 
 `duree_theorique_min` est calculee a partir d'une vitesse tiree aleatoirement,
 **avant** les ralentissements et le bruit. Elle ne provient pas de la cible.
@@ -71,8 +71,8 @@ Les anciens scores sur l'ancien dataset ne constituent pas une comparaison
 controlee avec les nouveaux scores.
 
 Ces mesures evaluent des regles de simulation, pas la precision du trafic reel.
-Les services de routage et meteo sont disponibles. L'orchestration des
-predictions et l'interface Streamlit restent a implementer.
+Les services de routage, meteo et prediction sont disponibles.
+L'interface Streamlit reste a implementer.
 
 ## Routage (Nominatim + OSRM)
 
@@ -210,3 +210,56 @@ Configuration facultative : `OPEN_METEO_URL` (URL complete compatible avec
 Les tests meteo simulent les reponses HTTP et ne consomment pas les API.
 La temperature est informative : elle n'est pas une entree du modele actuel.
 La prevision concerne uniquement le point de depart, pas tout le trajet.
+
+## Prediction complete d'un trajet
+
+Depuis la racine du projet, a la prochaine heure entiere :
+
+```powershell
+python -m services.predictor_logic Casablanca Rabat --intercity
+```
+
+On peut ajouter `--departure-time "AAAA-MM-JJTHH:MM"` avec une date future.
+`--urban` ou `--intercity` est obligatoire : le modele exige cette information.
+Pour une livraison en ville, fournir deux adresses distinctes et `--urban`.
+
+```python
+from datetime import datetime, timedelta, timezone
+from services.predictor_logic import PredictorService
+
+predictor = PredictorService()  # reutiliser cette instance entre requetes
+departure_time = datetime.now(timezone.utc) + timedelta(hours=2)
+result = predictor.predict_trip('Casablanca', 'Rabat', departure_time, urban=False)
+print(result['duree_estimee_min'], result['retard_min'], result['alert'])
+```
+
+La methode accepte aussi des dictionnaires `lat`, `lon`, `label` pour les lieux
+deja selectionnes apres une recherche ambigue. Dans ce cas, elle ne relance pas
+le geocodage. Une date invalide est refusee avant les appels de routage.
+
+`PredictorService` charge une fois les deux artefacts `.pkl`, verifie leurs
+colonnes et refuse une incompatibilite de version sklearn. Il utilise le meme
+encodage que l'entrainement et derive le jour, l'heure locale, le weekend et
+l'heure de pointe a partir de la date validee en `Africa/Casablanca`.
+
+Les champs principaux du resultat sont :
+
+- `distance_km`, `duree_theorique_min` : reference OSRM.
+- `duree_estimee_min` : duree de conduite predite par le modele.
+- `retard_min` : prediction moins reference, valeur signee conservee.
+- `departure_time`, `estimated_arrival_time` : instants ISO avec decalage UTC.
+- `alert` : code, libelle et couleur (`green`, `orange`, `red`).
+- `route`, `weather` : details et attributions des fournisseurs.
+- `urban`, `model_inputs` : choix explicite et entrees utilisees.
+- `estimate_kind` : `experimental_synthetic_model`.
+
+Les seuils d'alerte sont appliques avant tout arrondi; l'affichage peut ensuite
+formater les valeurs. Un ecart negatif reste visible et classe fluide.
+L'heure d'arrivee est calculee par addition de la duree en UTC, puis reconvertie
+au fuseau Maroc pour respecter la duree ecoulee lors des changements d'heure.
+
+Les erreurs de routage et meteo sont propagees avec leurs details : aucune
+prediction n'est produite si une etape necessaire echoue. Les erreurs du modele
+heritent de `PredictionError` (`ModelLoadError`, `InvalidPredictionInputError`,
+`InvalidPredictionError`). Les mesures restent experimentales, sans trafic en
+direct ni temps de preparation/attente d'une commande.

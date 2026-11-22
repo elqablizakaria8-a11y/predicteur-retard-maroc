@@ -181,6 +181,16 @@ class WeatherClient:
         except (sqlite3.Error, OSError) as exc:
             raise WeatherServiceUnavailableError('Cache meteo indisponible. Verifiez son chemin ou reessayez.') from exc
 
+    def validate_departure(self, departure):
+        """Valide l'heure locale et la fenetre avant tout appel reseau."""
+        local_departure = self._departure(departure)
+        utc_departure = local_departure.astimezone(timezone.utc)
+        now = self.clock().astimezone(timezone.utc)
+        end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=FORECAST_DAYS)
+        if utc_departure < now or utc_departure >= end:
+            raise ForecastUnavailableError('Choisissez un depart futur dans la fenetre de prevision de 7 jours.')
+        return local_departure
+
     def get_forecast(self, latitude, longitude, departure):
         try:
             if isinstance(latitude, bool) or isinstance(longitude, bool):
@@ -190,12 +200,8 @@ class WeatherClient:
                 raise ValueError
         except (TypeError, ValueError, OverflowError) as exc:
             raise InvalidWeatherInputError('Latitude ou longitude invalide.') from exc
-        local_departure = self._departure(departure)
+        local_departure = self.validate_departure(departure)
         utc_departure = local_departure.astimezone(timezone.utc)
-        now = self.clock().astimezone(timezone.utc)
-        end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=FORECAST_DAYS)
-        if utc_departure < now or utc_departure >= end:
-            raise ForecastUnavailableError('Choisissez un depart futur dans la fenetre de prevision de 7 jours.')
         # Les dates UTC font aussi partie de la cle du cache: aucun vieux jour
         # ne peut etre reutilise quand la fenetre glisse apres minuit UTC.
         payload = self._forecast(dict(latitude=lat, longitude=lon,
